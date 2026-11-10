@@ -1,0 +1,276 @@
+export const LANGUAGES = ['zh', 'en'];
+
+const zh = {
+  'app.name': '拉伸播报',
+  'app.tagline': '跟着语音，把每个动作做完。',
+  'nav.home': '我的流程',
+  'nav.settings': '设置',
+  'nav.history': '历史',
+
+  'home.new': '新建流程',
+  'home.start': '开始',
+  'home.steps': '{count} 个动作',
+  'home.duration': '约 {min} 分钟',
+  'home.empty': '还没有流程',
+  'home.emptyDesc': '新建一个流程，把动作按顺序排好，之后打开就能跟着语音做完。',
+  'home.resume': '继续上次',
+  'home.resumeDesc': '{name} · 第 {step} / {count} 个动作',
+  'home.delete': '删除流程',
+  'home.deleteMsg': '删除「{name}」？此操作不可撤销。',
+  'home.saved': '数据只保存在本机，不上传。',
+
+  'runner.stepOf': '第 {index} / {count} 个动作',
+  'runner.next': '下一个：{name}',
+  'runner.lastStep': '最后一个动作',
+  'runner.pause': '暂停',
+  'runner.resume': '继续',
+  'runner.previous': '上一个',
+  'runner.add10': '+10 秒',
+  'runner.skip': '跳过',
+  'runner.end': '结束流程',
+  'runner.endMsg': '结束当前流程？已经练过的时长仍会计入历史。',
+  'runner.done': '完成了',
+  'runner.doneDesc': '你已完成「{name}」。',
+  'runner.ended': '本次已结束',
+  'runner.endedDesc': '已经练过的时长已保存。',
+  'runner.total': '总时长',
+  'runner.backHome': '回到流程列表',
+  'runner.voiceBlocked': '浏览器拦住了语音。点一次「继续」即可放行声音。',
+  'runner.pausedLabel': '已暂停',
+  'runner.cueLabel': '动作提示',
+  'runner.progress': '流程进度',
+
+  'settings.title': '设置',
+  'settings.language': '语言',
+  'settings.languageDesc': '默认跟随系统语言；系统语言不支持时使用简体中文。',
+  'settings.auto': '跟随系统',
+  'settings.chinese': '简体中文',
+  'settings.english': 'English',
+  'settings.speech': '语音播报',
+  'settings.speechDesc': '关闭后计时照常，只是不再朗读提示。',
+  'settings.rate': '语速',
+  'settings.rateValue': '{value} 倍',
+  'settings.voices': '音色',
+  'settings.voicesDesc': '中英文各有四种声音，选中后整场流程都用它。所有语音都已内置，不需要联网。',
+  'settings.zhVoice': '中文声音',
+  'settings.enVoice': 'English voice',
+  'settings.preview': '试听当前音色',
+  'voice.zh.xiaoxiao': '晓晓 · 自然女声',
+  'voice.zh.xiaoyi': '晓伊 · 年轻女声',
+  'voice.zh.yunxi': '云希 · 清亮男声',
+  'voice.zh.yunjian': '云健 · 沉稳男声',
+  'voice.en.aria': 'Aria · 自然女声',
+  'voice.en.jenny': 'Jenny · 清晰女声',
+  'voice.en.guy': 'Guy · 沉稳男声',
+  'voice.en.andrew': 'Andrew · 对话男声',
+  'settings.data': '数据',
+  'settings.dataDesc': '全部数据只保存在这台设备的浏览器里，不需要账号，也不会上传。',
+  'settings.export': '导出备份',
+  'settings.import': '导入备份',
+  'settings.clear': '清空全部数据',
+  'settings.clearMsg': '将删除本机全部流程与历史记录，此操作不可撤销。',
+  'settings.about': '关于',
+  'settings.aboutText': '本应用完全离线运行，只负责按顺序提示与计时，不构成医学建议。',
+  'settings.importOk': '已恢复：{routines} 个流程、{history} 条历史记录。',
+  'settings.importError': '这个文件不是有效的备份。',
+  'settings.exportDone': '备份文件已生成。',
+  'settings.cleared': '已清空全部数据。',
+
+  'install.title': '安装',
+  'install.button': '安装到主屏幕',
+  'install.iosHint': '在 Safari 里点「分享」，再选「添加到主屏幕」，名称会是「拉伸播报·pwa」。',
+  'install.done': '已安装到主屏幕。',
+
+  'editor.title': '新建流程',
+  'editor.name': '流程名称',
+  'editor.namePlaceholder': '例如：晨间唤醒',
+  'editor.steps': '动作列表',
+  'editor.stepName': '动作名称',
+  'editor.seconds': '秒数',
+  'editor.addStep': '添加动作',
+  'editor.save': '保存流程',
+  'editor.remove': '删除',
+  'editor.errorName': '请先给流程起一个名字。',
+  'editor.errorSteps': '至少添加一个带名称的动作。',
+  'editor.tip': '动作名称会同时用于中文和英文界面。',
+  'editor.audioNote': '内置流程的中英文语音已随应用打包；自定义动作名没有预制语音，会播放通用提示音，动作名显示在屏幕上。',
+
+  'history.title': '历史',
+  'history.empty': '还没有记录',
+  'history.emptyDesc': '完成一次流程后，记录会出现在这里。',
+  'history.completed': '已完成',
+  'history.endedEarly': '提前结束',
+  'history.duration': '{min} 分 {sec} 秒',
+  'history.total': '累计练习',
+  'history.sessions': '{count} 次',
+  'history.clear': '清空历史',
+  'history.clearMsg': '将删除全部历史记录，流程不受影响。',
+  'history.deleted': '已清空历史记录。',
+
+  'common.cancel': '取消',
+  'common.confirm': '确认',
+  'common.delete': '删除',
+  'common.back': '返回',
+  'common.min': '分钟',
+  'common.sec': '秒',
+
+  'voice.firstUp': '第一个动作，{name}。',
+  'voice.next': '下一个，{name}。',
+  'voice.tenLeft': '还剩十秒。',
+  'voice.paused': '已暂停。',
+  'voice.resumed': '继续，{name}。',
+  'voice.done': '完成了，做得很好。',
+};
+
+const en = {
+  'app.name': 'Stretch Cues',
+  'app.tagline': 'Follow the voice. Finish every move.',
+  'nav.home': 'My routines',
+  'nav.settings': 'Settings',
+  'nav.history': 'History',
+
+  'home.new': 'New routine',
+  'home.start': 'Start',
+  'home.steps': '{count} moves',
+  'home.duration': 'about {min} min',
+  'home.empty': 'No routines yet',
+  'home.emptyDesc': 'Create a routine, put the moves in order, and the voice will guide you through it.',
+  'home.resume': 'Pick up where you left off',
+  'home.resumeDesc': '{name} · move {step} of {count}',
+  'home.delete': 'Delete routine',
+  'home.deleteMsg': 'Delete “{name}”? This cannot be undone.',
+  'home.saved': 'Everything stays on this device. Nothing is uploaded.',
+
+  'runner.stepOf': 'Move {index} of {count}',
+  'runner.next': 'Next: {name}',
+  'runner.lastStep': 'Last move',
+  'runner.pause': 'Pause',
+  'runner.resume': 'Resume',
+  'runner.previous': 'Previous',
+  'runner.add10': '+10 sec',
+  'runner.skip': 'Skip',
+  'runner.end': 'End session',
+  'runner.endMsg': 'End this session? Time you already practiced will still be saved.',
+  'runner.done': 'Nice work.',
+  'runner.doneDesc': 'You finished “{name}”.',
+  'runner.ended': 'Session ended',
+  'runner.endedDesc': 'The time you practiced has been saved.',
+  'runner.total': 'Total time',
+  'runner.backHome': 'Back to routines',
+  'runner.voiceBlocked': 'Your browser blocked the voice. Tap Resume once to allow sound.',
+  'runner.pausedLabel': 'Paused',
+  'runner.cueLabel': 'Cue',
+  'runner.progress': 'Routine progress',
+
+  'settings.title': 'Settings',
+  'settings.language': 'Language',
+  'settings.languageDesc': 'The app follows your system language unless you pick one. If your language is not supported, it falls back to Simplified Chinese.',
+  'settings.auto': 'System',
+  'settings.chinese': '简体中文',
+  'settings.english': 'English',
+  'settings.speech': 'Voice cues',
+  'settings.speechDesc': 'Turn this off to keep the timer but stop the spoken cues.',
+  'settings.rate': 'Speaking rate',
+  'settings.rateValue': '{value}×',
+  'settings.voices': 'Voices',
+  'settings.voicesDesc': 'Four voices for each language. The whole routine uses the voice you pick. Every clip is bundled; no internet needed.',
+  'settings.zhVoice': 'Chinese voice',
+  'settings.enVoice': 'English voice',
+  'settings.preview': 'Preview this voice',
+  'voice.zh.xiaoxiao': 'Xiaoxiao · natural female',
+  'voice.zh.xiaoyi': 'Xiaoyi · youthful female',
+  'voice.zh.yunxi': 'Yunxi · clear male',
+  'voice.zh.yunjian': 'Yunjian · steady male',
+  'voice.en.aria': 'Aria · natural female',
+  'voice.en.jenny': 'Jenny · clear female',
+  'voice.en.guy': 'Guy · steady male',
+  'voice.en.andrew': 'Andrew · conversational male',
+  'settings.data': 'Your data',
+  'settings.dataDesc': 'Everything stays in this browser on this device. No account, no cloud, no upload.',
+  'settings.export': 'Export backup',
+  'settings.import': 'Import backup',
+  'settings.clear': 'Delete all data',
+  'settings.clearMsg': 'This deletes every routine and every history record on this device. This cannot be undone.',
+  'settings.about': 'About',
+  'settings.aboutText': 'Stretch Cues runs entirely offline. It only times your routine and reads the cues aloud. It is not medical advice.',
+  'settings.importOk': 'Backup restored: {routines} routines and {history} history records.',
+  'settings.importError': 'That file is not a valid Stretch Cues backup.',
+  'settings.exportDone': 'Backup file created.',
+  'settings.cleared': 'All data deleted.',
+
+  'install.title': 'Install',
+  'install.button': 'Install to home screen',
+  'install.iosHint': 'In Safari, tap Share, then Add to Home Screen. The name will be “拉伸播报·pwa”.',
+  'install.done': 'Installed to your home screen.',
+
+  'editor.title': 'New routine',
+  'editor.name': 'Routine name',
+  'editor.namePlaceholder': 'e.g. Morning reset',
+  'editor.steps': 'Moves',
+  'editor.stepName': 'Move name',
+  'editor.seconds': 'Seconds',
+  'editor.addStep': 'Add a move',
+  'editor.save': 'Save routine',
+  'editor.remove': 'Remove',
+  'editor.errorName': 'Give the routine a name first.',
+  'editor.errorSteps': 'Add at least one move with a name.',
+  'editor.tip': 'The move name is used in both the Chinese and English interface.',
+  'editor.audioNote': 'Built-in routines ship with recorded Chinese and English cues. Custom move names have no recording yet, so you will hear a generic prompt and see the name on screen.',
+
+  'history.title': 'History',
+  'history.empty': 'No sessions yet',
+  'history.emptyDesc': 'Finish a routine and it will show up here.',
+  'history.completed': 'Completed',
+  'history.endedEarly': 'Ended early',
+  'history.duration': '{min} min {sec} sec',
+  'history.total': 'Total practice time',
+  'history.sessions': '{count} sessions',
+  'history.clear': 'Clear history',
+  'history.clearMsg': 'This deletes every history record. Your routines are not affected.',
+  'history.deleted': 'History cleared.',
+
+  'common.cancel': 'Cancel',
+  'common.confirm': 'Confirm',
+  'common.delete': 'Delete',
+  'common.back': 'Back',
+  'common.min': 'min',
+  'common.sec': 'sec',
+
+  'voice.firstUp': 'First up, {name}.',
+  'voice.next': 'Next, {name}.',
+  'voice.tenLeft': 'Ten seconds left.',
+  'voice.paused': 'Paused.',
+  'voice.resumed': 'Back to {name}.',
+  'voice.done': "Nice work. You're done.",
+};
+
+const dicts = { zh, en };
+
+export function translate(lang, key, params) {
+  const dict = dicts[lang] || zh;
+  let text = dict[key] || zh[key] || key;
+  if (params) {
+    Object.keys(params).forEach((name) => {
+      text = text.split('{' + name + '}').join(String(params[name]));
+    });
+  }
+  return text;
+}
+
+/** The first system language we support wins; otherwise Simplified Chinese. */
+export function detectSystemLanguage() {
+  const list = [];
+  if (Array.isArray(navigator.languages)) list.push.apply(list, navigator.languages);
+  if (navigator.language) list.push(navigator.language);
+  for (let i = 0; i < list.length; i++) {
+    const code = String(list[i] || '').toLowerCase();
+    if (code.indexOf('zh') === 0) return 'zh';
+    if (code.indexOf('en') === 0) return 'en';
+  }
+  return 'zh';
+}
+
+export function resolveLanguage(setting) {
+  if (setting === 'zh' || setting === 'en') return setting;
+  return detectSystemLanguage();
+}
