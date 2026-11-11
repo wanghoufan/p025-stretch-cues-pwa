@@ -693,7 +693,8 @@ function skipPhase() {
     finish(true);
     return;
   }
-  startStepAt(nextIndex);
+  // Skipping a rest means the transition cue was already spoken.
+  startStepAt(nextIndex, { leadIn: runner.phase !== 'rest' });
 }
 
 /** Library tap: practice one preset action for its catalog duration. */
