@@ -123,7 +123,7 @@ button.danger {
 
 button.text-danger {
   width: auto;
-  min-height: 48px;
+  min-height: 56px;
   margin: 4px 0 0;
   padding: 8px 0;
   border: 0;
@@ -134,7 +134,7 @@ button.text-danger {
 
 button.link {
   width: auto;
-  min-height: 48px;
+  min-height: 56px;
   margin: 0;
   padding: 8px 0;
   border: 0;
@@ -380,17 +380,51 @@ input[type="number"] {
   border-radius: 14px;
 }
 
-.step-edit-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  align-items: end;
+.step-head {
+  margin: 0;
 }
 
-.step-edit-row button {
+.step-name-static {
+  margin: 10px 0 2px;
+  font-size: 19px;
+  line-height: 1.4;
+}
+
+.step-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.step-actions button {
   width: auto;
-  min-width: 96px;
+  min-height: 56px;
   margin: 0;
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.step-actions button:last-child {
+  grid-column: 1 / -1;
+}
+
+.card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 4px 0 8px;
+}
+
+.card-actions button {
+  width: auto;
+  margin: 0;
+  text-align: center;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .history-row h3 { font-size: 23px; }
@@ -415,7 +449,9 @@ input[type="number"] {
 
 @media (max-width: 359px) {
   .quick-grid,
-  .control-grid {
+  .control-grid,
+  .card-actions,
+  .step-actions {
     grid-template-columns: 1fr;
   }
   .countdown { font-size: 64px; }

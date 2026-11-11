@@ -165,13 +165,15 @@ async function boot() {
       // desk-reset, bedtime-wind-down). Replace only those shipped rows with
       // the full catalog; custom routines are never touched.
       const presetIds = new Set(SEED_ROUTINES.map((routine) => routine.id));
-      const legacy = routines.filter((routine) => routine.builtin && !presetIds.has(routine.id));
+      const editedIds = new Set(routines.filter((routine) => routine.edited).map((routine) => routine.id));
+      const legacy = routines.filter((routine) => routine.builtin && !presetIds.has(routine.id) && !routine.edited);
       for (const routine of legacy) {
         await db.remove('routines', routine.id);
       }
       // Upsert the shipped presets so rest durations reach existing installs;
-      // user-created routines (builtin absent) are never touched.
-      await db.bulkPut('routines', SEED_ROUTINES);
+      // user-created routines (builtin absent) and presets the user already
+      // edited are never overwritten.
+      await db.bulkPut('routines', SEED_ROUTINES.filter((routine) => !editedIds.has(routine.id)));
       await db.put('meta', { key: 'seeded', version: SEED_VERSION });
       routines = await db.getAll('routines');
     }
@@ -232,7 +234,10 @@ function screenHome() {
         <span class="badge">${esc(t('home.steps', { count: routine.steps.length }))}</span>
       </div>
       <p class="muted">${esc(formatClock(routineSeconds(routine) * 1000))}${routine.restSec ? ' · ' + esc(t('home.rest', { sec: routine.restSec })) : ''}</p>
-      <button class="primary" data-action="start" data-id="${esc(routine.id)}">${esc(t('home.start'))}</button>
+      <div class="card-actions">
+        <button class="primary" data-action="start" data-id="${esc(routine.id)}">${esc(t('home.start'))}</button>
+        <button data-action="edit-routine" data-id="${esc(routine.id)}">${esc(t('home.edit'))}</button>
+      </div>
       <button class="text-danger" data-action="delete-routine" data-id="${esc(routine.id)}">${esc(t('home.delete'))}</button>
     </article>`).join('');
 
@@ -493,16 +498,23 @@ function screenHistory() {
 
 function screenEditor() {
   const editor = state.editor;
+  const canRename = !editor.builtin;
+  const last = editor.steps.length - 1;
+
   const steps = editor.steps.map((step, index) => `
     <div class="step-edit">
-      <label>${esc(t('editor.stepName'))}
-        <input type="text" value="${esc(step.name)}" data-field="step-name" data-index="${index}" placeholder="${esc(t('editor.namePlaceholder'))}">
+      <p class="step-head"><span class="badge">${esc(t('editor.stepIndex', { index: index + 1 }))}</span></p>
+      ${canRename ? `
+        <label>${esc(t('editor.stepName'))}
+          <input type="text" value="${esc(step.name)}" data-field="step-name" data-index="${index}" placeholder="${esc(t('editor.namePlaceholder'))}">
+        </label>` : `<p class="step-name-static">${esc(step.name)}</p>`}
+      <label>${esc(t('editor.seconds'))}
+        <input type="number" min="5" max="600" step="5" value="${esc(step.seconds)}" data-field="step-seconds" data-index="${index}">
       </label>
-      <div class="step-edit-row">
-        <label>${esc(t('editor.seconds'))}
-          <input type="number" min="5" max="600" step="5" value="${esc(step.seconds)}" data-field="step-seconds" data-index="${index}">
-        </label>
-        <button class="text-danger" data-action="remove-step" data-index="${index}">${esc(t('editor.remove'))}</button>
+      <div class="step-actions">
+        <button data-action="move-step" data-index="${index}" data-dir="-1" ${index === 0 ? 'disabled' : ''}>${esc(t('editor.moveUp'))}</button>
+        <button data-action="move-step" data-index="${index}" data-dir="1" ${index === last ? 'disabled' : ''}>${esc(t('editor.moveDown'))}</button>
+        <button class="danger" data-action="remove-step" data-index="${index}">${esc(t('editor.remove'))}</button>
       </div>
     </div>`).join('');
 
@@ -511,16 +523,32 @@ function screenEditor() {
       <div class="runner-top">
         <button class="link" data-action="go-home">${esc(t('common.back'))}</button>
       </div>
-      <h1>${esc(t('editor.title'))}</h1>
+      <h1>${esc(editor.id ? t('editor.titleEdit') : t('editor.title'))}</h1>
 
-      <label class="field">${esc(t('editor.name'))}
-        <input type="text" id="routine-name" value="${esc(editor.name)}" data-field="routine-name" placeholder="${esc(t('editor.namePlaceholder'))}">
-      </label>
+      <section class="card">
+        <label class="field">${esc(t('editor.name'))}
+          <input type="text" id="routine-name" value="${esc(editor.name)}" data-field="routine-name" placeholder="${esc(t('editor.namePlaceholder'))}">
+        </label>
+        ${editor.builtin ? `<p class="muted">${esc(t('editor.nameLangHint'))}</p>` : ''}
+        <label class="field">${esc(t('editor.rest'))}
+          <input type="number" min="0" max="600" step="5" value="${esc(editor.restSec)}" data-field="rest-seconds">
+        </label>
+        <p class="muted">${esc(t('editor.restHint'))}</p>
+      </section>
+
+      <section class="card">
+        <h2>${esc(t('editor.bulk'))}</h2>
+        <p class="muted">${esc(t('editor.bulkDesc'))}</p>
+        <label class="field">${esc(t('editor.bulkSeconds'))}
+          <input type="number" min="5" max="600" step="5" value="${esc(editor.bulkSeconds)}" data-field="bulk-seconds">
+        </label>
+        <button class="primary" data-action="apply-bulk-seconds" id="bulk-apply-btn">${esc(t('editor.bulkApply', { sec: editor.bulkSeconds }))}</button>
+      </section>
 
       <h2>${esc(t('editor.steps'))}</h2>
       ${steps || `<p class="muted">${esc(t('editor.errorSteps'))}</p>`}
       <button data-action="add-step">${esc(t('editor.addStep'))}</button>
-      <p class="muted">${esc(t('editor.tip'))}</p>
+      ${canRename ? `<p class="muted">${esc(t('editor.tip'))}</p>` : `<p class="muted">${esc(t('editor.builtinNote'))}</p>`}
       <p class="muted">${esc(t('editor.audioNote'))}</p>
       <button class="primary" data-action="save-routine">${esc(t('editor.save'))}</button>
     </div>`;
@@ -618,65 +646,169 @@ function plannedDoneMs(runner, stepMs, restMs) {
   return Math.min(ms, plannedMs(runner.routine));
 }
 
+/**
+ * A visible page ticks every 200 ms. Anything bigger means the tab was hidden,
+ * the timer was throttled, or the device slept, so the gap is settled in one
+ * pass instead of being replayed tick by tick.
+ */
+const CATCHUP_GAP_MS = 1200;
+
+function announceTenIfNeeded(runner) {
+  if (runner.phase !== 'step' || runner.spokenTen) return;
+  if (runner.remainingMs > 10000) return;
+  runner.spokenTen = true;
+  if (document.visibilityState !== 'hidden') voice.playFixed('ten');
+}
+
 function tick() {
   const runner = state.runner;
   if (!runner || !runner.running) return;
-  const now = performance.now();
-  const delta = Math.min(now - runner.lastTick, 2000);
-  runner.lastTick = now;
+  // Wall-clock time, never clamped: locking the screen or switching apps must
+  // not slow the routine down.
+  const now = Date.now();
+  const delta = Math.max(0, now - runner.lastTickAt);
+  runner.lastTickAt = now;
 
-  if (!runner.paused) {
-    if (runner.phase === 'step') {
-      // Stats count the action time only, matching the original runner.
-      runner.elapsedActionMs += delta;
-    }
-    runner.remainingMs -= delta;
-    if (runner.phase === 'step' && runner.remainingMs <= 10000 && !runner.spokenTen) {
-      runner.spokenTen = true;
-      voice.playFixed('ten');
-    }
-    if (runner.remainingMs <= 0) {
-      advancePhase();
-      return;
-    }
+  if (runner.paused || delta <= 0) {
+    updateRunnerUI();
+    return;
+  }
+
+  if (delta >= CATCHUP_GAP_MS || document.visibilityState === 'hidden') {
+    catchUp(runner, delta);
+    return;
+  }
+
+  runner.remainingMs -= delta;
+  if (runner.phase === 'step') {
+    // Stats count the action time only, matching the original runner.
+    runner.elapsedActionMs += delta;
+  }
+  if (runner.remainingMs <= 0) {
+    advancePhase();
+    return;
+  }
+  announceTenIfNeeded(runner);
+  updateRunnerUI();
+}
+
+/**
+ * Settle an arbitrarily long gap. Whole phases are consumed in one arithmetic
+ * pass — one iteration per phase, never one per millisecond — and only the
+ * phase we landed on is announced; finished phases are not replayed.
+ */
+function catchUp(runner, deltaMs) {
+  const outcome = advanceBy(runner, deltaMs);
+  if (outcome.finished) {
+    finish(true);
+    return;
+  }
+  if (outcome.moved > 0) {
+    runner.spokenTen = runner.remainingMs <= 10000;
+    persistSession();
+    voice.stop();
+    announceCurrentPhase(runner);
+  } else {
+    announceTenIfNeeded(runner);
   }
   updateRunnerUI();
 }
 
-/** Step → rest (when the routine has one) → next step; the last step finishes. */
-function advancePhase() {
-  const runner = state.runner;
-  if (!runner) return;
-  const next = runner.routine.steps[runner.stepIndex + 1];
+/**
+ * Consume `deltaMs` of real time from the runner, walking the state machine
+ * phase by phase. Returns how many phases were left behind and whether the
+ * routine completed.
+ */
+function advanceBy(runner, deltaMs) {
+  let left = Math.max(0, deltaMs);
+  let moved = 0;
+  for (;;) {
+    const remaining = Math.max(0, runner.remainingMs);
+    if (left < remaining) {
+      if (runner.phase === 'step') runner.elapsedActionMs += left;
+      runner.remainingMs = remaining - left;
+      return { finished: false, moved };
+    }
+    if (runner.phase === 'step') runner.elapsedActionMs += remaining;
+    left -= remaining;
+    if (!stepPhaseSilently(runner)) return { finished: true, moved };
+    moved += 1;
+    if (left <= 0) return { finished: false, moved };
+  }
+}
+
+/**
+ * Advance the state machine by one phase with no UI, voice or storage work.
+ * Returns false when the routine has just completed.
+ */
+function stepPhaseSilently(runner) {
+  const routine = runner.routine;
+  const next = routine.steps[runner.stepIndex + 1];
 
   if (runner.phase === 'step') {
     const rest = restSecondsFor(runner, runner.stepIndex);
     if (next && rest > 0) {
       runner.phase = 'rest';
       runner.remainingMs = rest * 1000;
-      runner.spokenTen = true;
-      persistSession();
-      voice.stop();
-      // The original speaks the prepared step once, at transition start.
-      if (runner.routine.builtin && next.clip) voice.playFixed('next-' + next.clip);
-      updateRunnerUI();
-      return;
+      return true;
     }
-    if (!next) {
-      finish(true);
-      return;
-    }
-    startStepAt(runner.stepIndex + 1);
-    return;
   }
+  if (!next) return false;
+  runner.stepIndex += 1;
+  runner.phase = 'step';
+  runner.remainingMs = Math.max(0, Number(routine.steps[runner.stepIndex].seconds || 0) * 1000);
+  return true;
+}
 
-  if (!next) {
+/** Step → rest (when the routine has one) → next step; the last step finishes. */
+function advancePhase() {
+  const runner = state.runner;
+  if (!runner) return;
+  const wasRest = runner.phase === 'rest';
+  if (!stepPhaseSilently(runner)) {
     finish(true);
     return;
   }
-  // The transition already announced this step ("下一个，X"), so the step
-  // itself only repeats its name in the original's "X，30秒" slot.
-  startStepAt(runner.stepIndex + 1, { leadIn: false });
+  runner.spokenTen = runner.remainingMs <= 10000;
+  persistSession();
+  voice.stop();
+  announcePhaseChange(runner, wasRest);
+  updateRunnerUI();
+}
+
+/** Speak the phase just entered, with the same cues as a normal transition. */
+function announcePhaseChange(runner, wasRest) {
+  const routine = runner.routine;
+  const step = routine.steps[runner.stepIndex];
+  if (runner.phase === 'rest') {
+    const next = routine.steps[runner.stepIndex + 1];
+    // The original speaks the prepared step once, at transition start.
+    if (routine.builtin && next && next.clip) voice.playFixed('next-' + next.clip);
+    return;
+  }
+  if (wasRest && step && step.clip) {
+    voice.playFixed(step.clip);
+    return;
+  }
+  if (step) voice.playStep(step, runner.stepIndex === 0, !!routine.builtin);
+}
+
+/**
+ * Back from the background: announce where we are now, once. Historical phases
+ * that elapsed while away are never replayed.
+ */
+function announceCurrentPhase(runner) {
+  if (document.visibilityState === 'hidden') return;
+  const routine = runner.routine;
+  const step = routine.steps[runner.stepIndex];
+  if (runner.phase === 'rest') {
+    const next = routine.steps[runner.stepIndex + 1];
+    if (routine.builtin && next && next.clip) voice.playFixed('next-' + next.clip);
+    return;
+  }
+  if (!step) return;
+  if (step.clip) voice.playFixed(step.clip);
+  else voice.playFixed('next-move');
 }
 
 function startStepAt(index, options) {
@@ -754,7 +886,7 @@ function startRun(routine, options) {
     remainingMs: remaining,
     paused: false,
     running: true,
-    lastTick: performance.now(),
+    lastTickAt: Date.now(),
     elapsedActionMs: 0,
     spokenTen: remaining <= 10000,
     timer: null,
@@ -823,12 +955,15 @@ function finish(completed) {
 /* ---------------- wake lock ---------------- */
 
 async function requestWakeLock() {
+  if (!('wakeLock' in navigator) || wakeLock) return;
   try {
-    if ('wakeLock' in navigator) {
-      wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', () => { wakeLock = null; });
-    }
+    const sentinel = await navigator.wakeLock.request('screen');
+    wakeLock = sentinel;
+    sentinel.addEventListener('release', () => {
+      if (wakeLock === sentinel) wakeLock = null;
+    });
   } catch (error) {
+    // Silent fallback: the routine keeps running, the screen may just dim.
     wakeLock = null;
   }
 }
@@ -842,8 +977,52 @@ function releaseWakeLock() {
 
 /* ---------------- editor ---------------- */
 
+/** One name slot per language so bilingual built-ins keep both labels. */
+function localizedName(item) {
+  return state.lang === 'en'
+    ? (item.nameEn || item.nameZh || '')
+    : (item.nameZh || item.nameEn || '');
+}
+
 function newEditor() {
-  state.editor = { name: '', steps: [{ name: '', seconds: 30 }] };
+  state.editor = {
+    id: null,
+    builtin: false,
+    original: null,
+    name: '',
+    restSec: 5,
+    bulkSeconds: 30,
+    steps: [{ source: null, name: '', seconds: 30 }],
+  };
+}
+
+/** Open an existing routine in the editor, keeping each step's cue and clip. */
+function editRoutine(routine) {
+  state.editor = {
+    id: routine.id,
+    builtin: !!routine.builtin,
+    original: routine,
+    name: localizedName(routine),
+    restSec: Math.max(0, Number(routine.restSec || 0)),
+    bulkSeconds: 30,
+    steps: routine.steps.map((step) => ({
+      source: step,
+      name: localizedName(step),
+      seconds: Math.max(5, Math.min(600, Number(step.seconds) || 30)),
+    })),
+  };
+}
+
+function clampStepSeconds(value) {
+  const num = Math.round(Number(value));
+  if (!Number.isFinite(num)) return 30;
+  return Math.max(5, Math.min(600, num));
+}
+
+function clampRestSeconds(value) {
+  const num = Math.round(Number(value));
+  if (!Number.isFinite(num) || num <= 0) return 0;
+  return Math.min(600, num);
 }
 
 function saveRoutine() {
@@ -854,38 +1033,67 @@ function saveRoutine() {
     toast(t('editor.errorName'));
     return;
   }
-  const steps = editor.steps
-    .map((step) => ({
-      name: String(step.name || '').trim(),
-      seconds: Math.max(5, Math.min(600, Number(step.seconds) || 30)),
-    }))
-    .filter((step) => step.name);
+
+  const isNew = !editor.id;
+  const id = editor.id || 'custom-' + Date.now();
+  const steps = [];
+
+  editor.steps.forEach((step) => {
+    const src = step.source || {};
+    const clean = String(step.name || '').trim();
+    if (isNew && !clean) return;
+    const next = Object.assign({}, src, {
+      // A deleted-then-added step has no source: give it a stable id.
+      id: src.id || id + '-' + (steps.length + 1),
+      seconds: clampStepSeconds(step.seconds),
+      cueZh: src.cueZh || '',
+      cueEn: src.cueEn || '',
+    });
+    if (isNew) {
+      next.nameZh = clean;
+      next.nameEn = clean;
+    } else if (!editor.builtin) {
+      // Custom routines use one label for both languages, as on creation.
+      if (clean) {
+        next.nameZh = clean;
+        next.nameEn = clean;
+      }
+    }
+    steps.push(next);
+  });
+
   if (!steps.length) {
     toast(t('editor.errorSteps'));
     return;
   }
 
-  const id = 'custom-' + Date.now();
-  const routine = {
+  const routine = Object.assign({}, editor.original || {}, {
     id,
-    nameZh: name,
-    nameEn: name,
-    builtin: false,
-    steps: steps.map((step, index) => ({
-      id: id + '-' + index,
-      nameZh: step.name,
-      nameEn: step.name,
-      seconds: step.seconds,
-      cueZh: '',
-      cueEn: '',
-    })),
-  };
+    restSec: clampRestSeconds(editor.restSec),
+    steps,
+  });
+
+  if (isNew) {
+    routine.nameZh = name;
+    routine.nameEn = name;
+    routine.builtin = false;
+  } else if (editor.builtin) {
+    // Built-ins carry two names; only the one being shown is renamed.
+    if (state.lang === 'en') routine.nameEn = name;
+    else routine.nameZh = name;
+    // Peeled off the seed catalog for good: a later seed upgrade must keep it.
+    routine.edited = true;
+  } else {
+    routine.nameZh = name;
+    routine.nameEn = name;
+  }
 
   db.put('routines', routine).then(() => db.getAll('routines')).then((routines) => {
     state.routines = sortRoutines(routines);
     state.editor = null;
     state.screen = 'home';
     render();
+    toast(t('editor.saved'));
   }).catch(() => toast(t('settings.importError')));
 }
 
@@ -1011,6 +1219,15 @@ function onClick(event) {
     if (routine) startRun(routine);
     return;
   }
+  if (action === 'edit-routine') {
+    const routine = state.routines.find((item) => item.id === id);
+    if (routine) {
+      editRoutine(routine);
+      state.screen = 'editor';
+      render();
+    }
+    return;
+  }
   if (action === 'resume-saved' && state.saved) {
     const routine = state.routines.find((item) => item.id === state.saved.routineId);
     if (routine) {
@@ -1039,7 +1256,7 @@ function onClick(event) {
 
   if (action === 'pause' && state.runner) {
     state.runner.paused = true;
-    state.runner.lastTick = performance.now();
+    state.runner.lastTickAt = Date.now();
     voice.stop();
     voice.playFixed('paused');
     persistSession();
@@ -1050,8 +1267,9 @@ function onClick(event) {
     voice.unlock();
     applyVoiceSettings();
     state.runner.paused = false;
-    state.runner.lastTick = performance.now();
+    state.runner.lastTickAt = Date.now();
     voice.playFixed('resumed');
+    requestWakeLock();
     updateRunnerUI();
     return;
   }
@@ -1084,14 +1302,32 @@ function onClick(event) {
   }
 
   if (action === 'add-step' && state.editor) {
-    state.editor.steps.push({ name: '', seconds: 30 });
+    state.editor.steps.push({ source: null, name: '', seconds: 30 });
     render();
     return;
   }
   if (action === 'remove-step' && state.editor) {
     state.editor.steps.splice(index, 1);
-    if (!state.editor.steps.length) state.editor.steps.push({ name: '', seconds: 30 });
+    if (!state.editor.steps.length) {
+      state.editor.steps.push({ source: null, name: '', seconds: 30 });
+    }
     render();
+    return;
+  }
+  if (action === 'move-step' && state.editor) {
+    const dir = Number(target.dataset.dir) || 0;
+    const to = index + dir;
+    const list = state.editor.steps;
+    if (!dir || index < 0 || to < 0 || to >= list.length) return;
+    list.splice(to, 0, list.splice(index, 1)[0]);
+    render();
+    return;
+  }
+  if (action === 'apply-bulk-seconds' && state.editor) {
+    const seconds = clampStepSeconds(state.editor.bulkSeconds);
+    state.editor.steps.forEach((step) => { step.seconds = seconds; });
+    render();
+    toast(t('editor.bulkDone', { sec: seconds }));
     return;
   }
   if (action === 'save-routine') { saveRoutine(); return; }
@@ -1147,6 +1383,14 @@ function onInput(event) {
     state.editor.steps[Number(el.dataset.index)].name = el.value;
   } else if (el.dataset.field === 'step-seconds') {
     state.editor.steps[Number(el.dataset.index)].seconds = Number(el.value) || 30;
+  } else if (el.dataset.field === 'rest-seconds') {
+    const value = Number(el.value);
+    state.editor.restSec = Number.isFinite(value) ? Math.max(0, Math.min(600, Math.round(value))) : 0;
+  } else if (el.dataset.field === 'bulk-seconds') {
+    const value = Number(el.value);
+    state.editor.bulkSeconds = Number.isFinite(value) ? Math.round(value) : 30;
+    const button = document.getElementById('bulk-apply-btn');
+    if (button) button.textContent = t('editor.bulkApply', { sec: state.editor.bulkSeconds });
   }
 }
 
@@ -1199,21 +1443,41 @@ window.addEventListener('appinstalled', () => {
   render();
 });
 
-document.addEventListener('visibilitychange', () => {
+/**
+ * Hidden: keep running (only the pause button may stop the clock).
+ * Visible: settle the gap in one pass, announce the current phase once, and
+ * take the wake lock again.
+ */
+function onVisibilityChange() {
+  const runner = state.runner;
+  if (!runner) return;
+
   if (document.visibilityState === 'hidden') {
-    if (state.runner && !state.runner.paused) {
-      state.runner.paused = true;
-      persistSession();
-      voice.stop();
-      updateRunnerUI();
-    }
+    persistSession();
     return;
   }
-  if (state.runner) {
-    state.runner.lastTick = performance.now();
-    if (!state.runner.paused) requestWakeLock();
+
+  const now = Date.now();
+  const delta = Math.max(0, now - runner.lastTickAt);
+  runner.lastTickAt = now;
+  if (!runner.paused && delta > 0) {
+    const outcome = advanceBy(runner, delta);
+    if (outcome.finished) {
+      finish(true);
+      return;
+    }
+    runner.spokenTen = runner.remainingMs <= 10000;
+    persistSession();
   }
-});
+  if (!runner.paused) {
+    voice.stop();
+    announceCurrentPhase(runner);
+    requestWakeLock();
+  }
+  updateRunnerUI();
+}
+
+document.addEventListener('visibilitychange', onVisibilityChange);
 
 appEl.addEventListener('click', onClick);
 appEl.addEventListener('input', onInput);
