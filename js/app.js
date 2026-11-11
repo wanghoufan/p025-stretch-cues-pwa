@@ -1,5 +1,5 @@
 import { translate, resolveLanguage } from './i18n.js';
-import { SEED_ROUTINES } from './seed.js';
+import { SEED_ACTIONS, SEED_ROUTINES, SEED_VERSION } from './seed.js';
 import * as db from './db.js';
 import { VoiceEngine } from './voice.js';
 
@@ -32,6 +32,7 @@ const state = {
   routines: [],
   history: [],
   screen: 'home',
+  libraryScene: 'all',
   runner: null,
   saved: null,
   editor: null,
@@ -56,6 +57,28 @@ function localName(item) {
 
 function stepCue(step) {
   return state.lang === 'en' ? (step.cueEn || step.cueZh || '') : (step.cueZh || step.cueEn || '');
+}
+
+const PRESET_ORDER = new Map(SEED_ROUTINES.map((routine, index) => [routine.id, index]));
+
+/** Presets in catalog order, then anything the user made. */
+function sortRoutines(list) {
+  return list.slice().sort((a, b) => {
+    const aOrder = PRESET_ORDER.has(a.id) ? PRESET_ORDER.get(a.id) : Number.MAX_SAFE_INTEGER;
+    const bOrder = PRESET_ORDER.has(b.id) ? PRESET_ORDER.get(b.id) : Number.MAX_SAFE_INTEGER;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return String(a.id).localeCompare(String(b.id));
+  });
+}
+
+function localActionName(action) {
+  return state.lang === 'en' ? action.en : action.zh;
+}
+
+function actionTags(action) {
+  const parts = action.bodypart.map((part) => t('part.' + part));
+  parts.push(t('diff.' + action.difficulty));
+  return parts.join(' · ');
 }
 
 function formatClock(ms) {
@@ -117,13 +140,30 @@ async function boot() {
 
     let routines = await db.getAll('routines');
     const seeded = await db.get('meta', 'seeded');
+    const seededVersion = Number(seeded && seeded.version) || 0;
     if (!routines.length && !seeded) {
       await db.bulkPut('routines', SEED_ROUTINES);
-      await db.put('meta', { key: 'seeded', version: 1 });
+      await db.put('meta', { key: 'seeded', version: SEED_VERSION });
+      routines = await db.getAll('routines');
+    } else if (seeded && seededVersion < SEED_VERSION) {
+      // Every user already has the three legacy presets (morning-reset,
+      // desk-reset, bedtime-wind-down). Replace only those shipped rows with
+      // the full catalog; custom routines are never touched.
+      const presetIds = new Set(SEED_ROUTINES.map((routine) => routine.id));
+      const legacy = routines.filter((routine) => routine.builtin && !presetIds.has(routine.id));
+      for (const routine of legacy) {
+        await db.remove('routines', routine.id);
+      }
+      const existingIds = new Set(routines.map((routine) => routine.id));
+      const missing = SEED_ROUTINES.filter((routine) => !existingIds.has(routine.id));
+      if (missing.length) {
+        await db.bulkPut('routines', missing);
+      }
+      await db.put('meta', { key: 'seeded', version: SEED_VERSION });
       routines = await db.getAll('routines');
     }
 
-    state.routines = routines;
+    state.routines = sortRoutines(routines);
     state.history = await db.getAll('history');
     state.lang = resolveLanguage(state.languageSetting);
     applyVoiceSettings();
@@ -193,6 +233,7 @@ function screenHome() {
 
       <div class="quick-grid">
         <button class="primary" data-action="go-new">${esc(t('home.new'))}</button>
+        <button data-action="go-library">${esc(t('nav.library'))}</button>
         <button data-action="go-history">${esc(t('nav.history'))}</button>
         <button data-action="go-settings">${esc(t('nav.settings'))}</button>
       </div>
@@ -207,6 +248,46 @@ function screenHome() {
         </div>`}
       <p class="foot">${esc(t('home.saved'))}</p>
       ${state.canInstall ? `<button class="install" data-action="install">${esc(t('install.button'))}</button>` : ''}
+    </div>`;
+}
+
+const LIBRARY_SCENES = ['stretch', 'warmup', 'core'];
+
+function actionCard(action) {
+  return `
+    <article class="card routine-card">
+      <div class="routine-head">
+        <h3>${esc(localActionName(action))}</h3>
+        <span class="badge">${esc(t('library.seconds', { seconds: action.seconds }))}</span>
+      </div>
+      <p class="muted">${esc(actionTags(action))}</p>
+      <button class="primary" data-action="start-action" data-key="${esc(action.key)}">${esc(t('library.start'))}</button>
+    </article>`;
+}
+
+function screenLibrary() {
+  const chips = [['all', t('library.all')]]
+    .concat(LIBRARY_SCENES.map((scene) => [scene, t('library.scene.' + scene)]))
+    .map(([key, label]) => `<button class="${state.libraryScene === key ? 'primary' : ''}" data-action="library-scene" data-scene="${key}">${esc(label)}</button>`)
+    .join('');
+
+  const scenes = state.libraryScene === 'all' ? LIBRARY_SCENES : [state.libraryScene];
+  const sections = scenes.map((scene) => {
+    const actions = SEED_ACTIONS.filter((action) => action.scene === scene);
+    if (!actions.length) return '';
+    const heading = state.libraryScene === 'all' ? `<h2>${esc(t('library.scene.' + scene))}</h2>` : '';
+    return heading + actions.map(actionCard).join('');
+  }).join('');
+
+  return `
+    <div class="screen">
+      <div class="runner-top">
+        <button class="link" data-action="go-home">${esc(t('common.back'))}</button>
+      </div>
+      <h1>${esc(t('library.title'))}</h1>
+      <p class="muted">${esc(t('library.desc', { count: SEED_ACTIONS.length }))}</p>
+      <div class="quick-grid">${chips}</div>
+      ${sections}
     </div>`;
 }
 
@@ -443,6 +524,7 @@ function render() {
   }
   appEl.innerHTML = ({
     home: screenHome,
+    library: screenLibrary,
     settings: screenSettings,
     history: screenHistory,
     editor: screenEditor,
@@ -518,6 +600,27 @@ function advanceStep() {
   persistSession();
   voice.playStep(runner.routine.steps[runner.stepIndex], false, !!runner.routine.builtin);
   updateRunnerUI();
+}
+
+/** Library tap: practice one preset action for its catalog duration. */
+function startAction(key) {
+  const action = SEED_ACTIONS.find((item) => item.key === key);
+  if (!action) return;
+  startRun({
+    id: 'action-' + action.key,
+    nameZh: action.zh,
+    nameEn: action.en,
+    builtin: true,
+    steps: [{
+      id: 'action-' + action.key,
+      nameZh: action.zh,
+      nameEn: action.en,
+      cueZh: action.cueZh,
+      cueEn: action.cueEn,
+      seconds: action.seconds,
+      clip: action.clip,
+    }],
+  });
 }
 
 function startRun(routine, options) {
@@ -662,7 +765,7 @@ function saveRoutine() {
   };
 
   db.put('routines', routine).then(() => db.getAll('routines')).then((routines) => {
-    state.routines = routines;
+    state.routines = sortRoutines(routines);
     state.editor = null;
     state.screen = 'home';
     render();
@@ -725,7 +828,7 @@ async function importBackup(file) {
       state.lang = resolveLanguage(state.languageSetting);
       applyVoiceSettings();
     }
-    state.routines = await db.getAll('routines');
+    state.routines = sortRoutines(await db.getAll('routines'));
     state.history = await db.getAll('history');
     state.saved = null;
     localStorage.removeItem(ACTIVE_KEY);
@@ -741,7 +844,7 @@ async function clearAllData() {
   if (!window.confirm(t('settings.clearMsg'))) return;
   await db.clear('routines');
   await db.clear('history');
-  await db.put('meta', { key: 'seeded', version: 1 });
+  await db.put('meta', { key: 'seeded', version: SEED_VERSION });
   state.routines = [];
   state.history = [];
   state.saved = null;
@@ -775,6 +878,13 @@ function onClick(event) {
     return;
   }
   if (action === 'go-settings') { state.screen = 'settings'; render(); return; }
+  if (action === 'go-library') { state.screen = 'library'; render(); return; }
+  if (action === 'library-scene') {
+    state.libraryScene = target.dataset.scene || 'all';
+    render();
+    return;
+  }
+  if (action === 'start-action') { startAction(target.dataset.key); return; }
   if (action === 'go-history') { state.screen = 'history'; render(); return; }
   if (action === 'go-new') { newEditor(); state.screen = 'editor'; render(); return; }
 
@@ -793,7 +903,7 @@ function onClick(event) {
     if (!routine) return;
     if (!window.confirm(t('home.deleteMsg', { name: localName(routine) }))) return;
     db.remove('routines', id).then(() => db.getAll('routines')).then((routines) => {
-      state.routines = routines;
+      state.routines = sortRoutines(routines);
       if (state.saved && state.saved.routineId === id) {
         state.saved = null;
         localStorage.removeItem(ACTIVE_KEY);
@@ -866,7 +976,7 @@ function onClick(event) {
   if (action === 'preview-voice') {
     voice.unlock();
     applyVoiceSettings();
-    voice.playSequence(['first', 'step-bed-1']);
+    voice.playSequence(['first', 'action-neck-side-bend']);
     return;
   }
   if (action === 'import') {

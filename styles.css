@@ -167,10 +167,6 @@ input:focus-visible {
   text-align: center;
 }
 
-.quick-grid button:first-child {
-  grid-column: 1 / -1;
-}
-
 .routine-head {
   display: flex;
   flex-wrap: wrap;
@@ -421,9 +417,6 @@ input[type="number"] {
   .quick-grid,
   .control-grid {
     grid-template-columns: 1fr;
-  }
-  .quick-grid button:first-child {
-    grid-column: auto;
   }
   .countdown { font-size: 64px; }
 }

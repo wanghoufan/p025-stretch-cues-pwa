@@ -1,4 +1,4 @@
-const CACHE = 'stretch-pwa-v4';
+const CACHE = 'stretch-pwa-v5';
 const ASSETS = [
   './',
   './index.html',

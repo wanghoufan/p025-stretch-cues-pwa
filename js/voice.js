@@ -129,7 +129,7 @@ export class VoiceEngine {
    */
   playStep(step, isFirst, hasClip) {
     const keys = [isFirst ? 'first' : 'next'];
-    keys.push(hasClip ? 'step-' + step.id : 'next-move');
+    keys.push(hasClip ? (step.clip || 'step-' + step.id) : 'next-move');
     this.playSequence(keys);
   }
 
