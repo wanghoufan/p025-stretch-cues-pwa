@@ -1,9 +1,10 @@
-const CACHE = 'stretch-pwa-v6';
+const CACHE = 'stretch-pwa-v7';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './manifest.webmanifest',
+  './manifest.en.webmanifest',
   './js/app.js',
   './js/db.js',
   './js/i18n.js',

@@ -125,6 +125,18 @@ function applyVoiceSettings() {
   voice.setVoices(state.zhVoice, state.enVoice);
 }
 
+/** The home-screen name follows the resolved UI language, not the browser UI. */
+function applyManifestLanguage(lang) {
+  const link = document.getElementById('manifest-link');
+  if (link) {
+    link.setAttribute('href', lang === 'en' ? './manifest.en.webmanifest' : './manifest.webmanifest');
+  }
+  const title = lang === 'en' ? 'Stretch Cues' : '拉伸播报·pwa';
+  const apple = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+  if (apple) apple.setAttribute('content', title);
+  document.title = title;
+}
+
 function canUseServiceWorker() {
   return 'serviceWorker' in navigator
     && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1');
@@ -168,6 +180,7 @@ async function boot() {
     state.history = await db.getAll('history');
     state.lang = resolveLanguage(state.languageSetting);
     applyVoiceSettings();
+    applyManifestLanguage(state.lang);
 
     try {
       const raw = localStorage.getItem(ACTIVE_KEY);
@@ -931,6 +944,7 @@ async function importBackup(file) {
       state.enVoice = payload.data.settings.enVoice || 'aria';
       state.lang = resolveLanguage(state.languageSetting);
       applyVoiceSettings();
+      applyManifestLanguage(state.lang);
     }
     state.routines = sortRoutines(await db.getAll('routines'));
     state.history = await db.getAll('history');
@@ -1142,6 +1156,7 @@ function onChange(event) {
     state.languageSetting = el.value;
     state.lang = resolveLanguage(state.languageSetting);
     applyVoiceSettings();
+    applyManifestLanguage(state.lang);
     saveSettings();
     render();
     return;
