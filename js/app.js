@@ -93,7 +93,10 @@ function formatDuration(seconds) {
 }
 
 function routineSeconds(routine) {
-  return routine.steps.reduce((sum, step) => sum + Number(step.seconds || 0), 0);
+  const rest = Number(routine.restSec || 0);
+  return routine.steps.reduce((sum, step, index) => (
+    sum + Number(step.seconds || 0) + (index < routine.steps.length - 1 ? rest : 0)
+  ), 0);
 }
 
 function toast(text) {
@@ -154,11 +157,9 @@ async function boot() {
       for (const routine of legacy) {
         await db.remove('routines', routine.id);
       }
-      const existingIds = new Set(routines.map((routine) => routine.id));
-      const missing = SEED_ROUTINES.filter((routine) => !existingIds.has(routine.id));
-      if (missing.length) {
-        await db.bulkPut('routines', missing);
-      }
+      // Upsert the shipped presets so rest durations reach existing installs;
+      // user-created routines (builtin absent) are never touched.
+      await db.bulkPut('routines', SEED_ROUTINES);
       await db.put('meta', { key: 'seeded', version: SEED_VERSION });
       routines = await db.getAll('routines');
     }
@@ -217,7 +218,7 @@ function screenHome() {
         <h3>${esc(localName(routine))}</h3>
         <span class="badge">${esc(t('home.steps', { count: routine.steps.length }))}</span>
       </div>
-      <p class="muted">${esc(t('home.duration', { min: Math.max(1, Math.round(routineSeconds(routine) / 60)) }))}</p>
+      <p class="muted">${esc(formatClock(routineSeconds(routine) * 1000))}${routine.restSec ? ' · ' + esc(t('home.rest', { sec: routine.restSec })) : ''}</p>
       <button class="primary" data-action="start" data-id="${esc(routine.id)}">${esc(t('home.start'))}</button>
       <button class="text-danger" data-action="delete-routine" data-id="${esc(routine.id)}">${esc(t('home.delete'))}</button>
     </article>`).join('');
@@ -540,29 +541,68 @@ function updateRunnerUI() {
   if (!runner) return;
   const step = runner.routine.steps[runner.stepIndex];
   const total = runner.routine.steps.length;
+  const isRest = runner.phase === 'rest';
+  const restMs = restSecondsFor(runner, runner.stepIndex) * 1000;
   const stepMs = Math.max(1000, Number(step.seconds || 0) * 1000);
-  const doneRatio = (runner.stepIndex + (1 - Math.max(0, runner.remainingMs) / stepMs)) / total;
+  const totalMs = Math.max(1, plannedMs(runner.routine));
+  const doneMs = plannedDoneMs(runner, stepMs, restMs);
+  const next = runner.stepIndex + 1 < total ? runner.routine.steps[runner.stepIndex + 1] : null;
+  const position = isRest ? Math.min(runner.stepIndex + 2, total) : runner.stepIndex + 1;
 
   const setText = (id, value) => {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
   };
   setText('countdown', formatClock(runner.remainingMs));
-  setText('step-name', localName(step));
-  setText('cue', stepCue(step));
-  setText('phase', runner.paused ? t('runner.pausedLabel') : t('runner.cueLabel'));
-  setText('phase-label', t('runner.stepOf', { index: runner.stepIndex + 1, count: total }));
-  const next = runner.stepIndex + 1 < total ? runner.routine.steps[runner.stepIndex + 1] : null;
-  setText('next-line', next ? t('runner.next', { name: localName(next) }) : t('runner.lastStep'));
+  setText('step-name', isRest ? t('runner.restHeadline') : localName(step));
+  setText('cue', isRest
+    ? t('runner.restCue', { name: next ? localName(next) : '' })
+    : stepCue(step));
+  setText('phase', runner.paused
+    ? t('runner.pausedLabel')
+    : (isRest ? t('runner.restLabel') : t('runner.cueLabel')));
+  setText('phase-label', t('runner.stepOf', { index: position, count: total }));
+  setText('next-line', isRest
+    ? t('runner.restCountdown', { sec: Math.max(0, Math.ceil(runner.remainingMs / 1000)) })
+    : (next ? t('runner.next', { name: localName(next) }) : t('runner.lastStep')));
 
   const fill = document.getElementById('progress-fill');
-  if (fill) fill.style.width = Math.max(0, Math.min(100, doneRatio * 100)).toFixed(2) + '%';
+  if (fill) fill.style.width = Math.max(0, Math.min(100, (doneMs / totalMs) * 100)).toFixed(2) + '%';
 
   const pauseBtn = document.getElementById('pause-btn');
   if (pauseBtn) {
     pauseBtn.textContent = runner.paused ? t('runner.resume') : t('runner.pause');
     pauseBtn.dataset.action = runner.paused ? 'resume' : 'pause';
   }
+  const addBtn = document.querySelector('[data-action="add10"]');
+  if (addBtn) addBtn.disabled = isRest;
+  const skipBtn = document.querySelector('[data-action="skip"]');
+  if (skipBtn) skipBtn.textContent = isRest ? t('runner.skipRest') : t('runner.skip');
+}
+
+function restSecondsFor(runner, index) {
+  if (index >= runner.routine.steps.length - 1) return 0;
+  return Math.max(0, Number(runner.routine.restSec || 0));
+}
+
+function plannedMs(routine) {
+  const rest = Math.max(0, Number(routine.restSec || 0)) * 1000;
+  return routine.steps.reduce((sum, step, index) => (
+    sum + Number(step.seconds || 0) * 1000 + (index < routine.steps.length - 1 ? rest : 0)
+  ), 0);
+}
+
+function plannedDoneMs(runner, stepMs, restMs) {
+  const rest = Math.max(0, Number(runner.routine.restSec || 0)) * 1000;
+  let ms = 0;
+  for (let i = 0; i < runner.stepIndex; i += 1) {
+    ms += Number(runner.routine.steps[i].seconds || 0) * 1000;
+    if (i < runner.routine.steps.length - 1) ms += rest;
+  }
+  const phaseTotal = runner.phase === 'rest' ? restMs : stepMs;
+  if (runner.phase === 'rest') ms += stepMs;
+  ms += Math.max(0, phaseTotal - Math.max(0, runner.remainingMs));
+  return Math.min(ms, plannedMs(runner.routine));
 }
 
 function tick() {
@@ -573,33 +613,87 @@ function tick() {
   runner.lastTick = now;
 
   if (!runner.paused) {
+    if (runner.phase === 'step') {
+      // Stats count the action time only, matching the original runner.
+      runner.elapsedActionMs += delta;
+    }
     runner.remainingMs -= delta;
-    runner.elapsedActionMs += delta;
-    if (runner.remainingMs <= 10000 && !runner.spokenTen) {
+    if (runner.phase === 'step' && runner.remainingMs <= 10000 && !runner.spokenTen) {
       runner.spokenTen = true;
       voice.playFixed('ten');
     }
     if (runner.remainingMs <= 0) {
-      advanceStep();
+      advancePhase();
       return;
     }
   }
   updateRunnerUI();
 }
 
-function advanceStep() {
+/** Step → rest (when the routine has one) → next step; the last step finishes. */
+function advancePhase() {
   const runner = state.runner;
   if (!runner) return;
-  if (runner.stepIndex + 1 >= runner.routine.steps.length) {
+  const next = runner.routine.steps[runner.stepIndex + 1];
+
+  if (runner.phase === 'step') {
+    const rest = restSecondsFor(runner, runner.stepIndex);
+    if (next && rest > 0) {
+      runner.phase = 'rest';
+      runner.remainingMs = rest * 1000;
+      runner.spokenTen = true;
+      persistSession();
+      voice.stop();
+      // The original speaks the prepared step once, at transition start.
+      if (runner.routine.builtin && next.clip) voice.playFixed('next-' + next.clip);
+      updateRunnerUI();
+      return;
+    }
+    if (!next) {
+      finish(true);
+      return;
+    }
+    startStepAt(runner.stepIndex + 1);
+    return;
+  }
+
+  if (!next) {
     finish(true);
     return;
   }
-  runner.stepIndex += 1;
-  runner.remainingMs = Number(runner.routine.steps[runner.stepIndex].seconds || 0) * 1000;
+  // The transition already announced this step ("下一个，X"), so the step
+  // itself only repeats its name in the original's "X，30秒" slot.
+  startStepAt(runner.stepIndex + 1, { leadIn: false });
+}
+
+function startStepAt(index, options) {
+  const runner = state.runner;
+  if (!runner) return;
+  const opts = options || {};
+  const step = runner.routine.steps[index];
+  runner.stepIndex = index;
+  runner.phase = 'step';
+  runner.remainingMs = Number(step.seconds || 0) * 1000;
   runner.spokenTen = runner.remainingMs <= 10000;
   persistSession();
-  voice.playStep(runner.routine.steps[runner.stepIndex], false, !!runner.routine.builtin);
+  voice.stop();
+  if (opts.playCue !== false) {
+    if (opts.leadIn === false && step.clip) voice.playFixed(step.clip);
+    else voice.playStep(step, index === 0, !!runner.routine.builtin);
+  }
   updateRunnerUI();
+}
+
+/** Skip the current phase: a rest jumps to the next step, a step skips its rest. */
+function skipPhase() {
+  const runner = state.runner;
+  if (!runner) return;
+  const nextIndex = runner.stepIndex + 1;
+  if (nextIndex >= runner.routine.steps.length) {
+    finish(true);
+    return;
+  }
+  startStepAt(nextIndex);
 }
 
 /** Library tap: practice one preset action for its catalog duration. */
@@ -628,9 +722,13 @@ function startRun(routine, options) {
   const opts = options || {};
   const startIndex = Math.max(0, Math.min(routine.steps.length - 1, Number(opts.stepIndex) || 0));
   const startStep = routine.steps[startIndex];
-  const remaining = Number(opts.remainingMs) > 0
-    ? Number(opts.remainingMs)
+  const startPhase = opts.phase === 'rest' && restSecondsFor({ routine, stepIndex: startIndex }, startIndex) > 0
+    ? 'rest'
+    : 'step';
+  const phaseDefaultMs = startPhase === 'rest'
+    ? restSecondsFor({ routine, stepIndex: startIndex }, startIndex) * 1000
     : Number(startStep.seconds || 0) * 1000;
+  const remaining = Number(opts.remainingMs) > 0 ? Number(opts.remainingMs) : phaseDefaultMs;
 
   voice.unlock();
   applyVoiceSettings();
@@ -638,6 +736,7 @@ function startRun(routine, options) {
   state.runner = {
     routine,
     stepIndex: startIndex,
+    phase: startPhase,
     remainingMs: remaining,
     paused: false,
     running: true,
@@ -652,7 +751,10 @@ function startRun(routine, options) {
   localStorage.removeItem(ACTIVE_KEY);
   render();
 
-  voice.playStep(startStep, startIndex === 0, !!routine.builtin);
+  // A resumed rest does not replay the cue; a fresh start announces the step.
+  if (startPhase === 'step') {
+    voice.playStep(startStep, startIndex === 0, !!routine.builtin);
+  }
   state.runner.timer = setInterval(tick, 200);
   requestWakeLock();
 }
@@ -663,6 +765,7 @@ function persistSession() {
   const payload = {
     routineId: runner.routine.id,
     stepIndex: runner.stepIndex,
+    phase: runner.phase,
     remainingMs: Math.max(0, Math.round(runner.remainingMs)),
     savedAt: Date.now(),
   };
@@ -895,7 +998,13 @@ function onClick(event) {
   }
   if (action === 'resume-saved' && state.saved) {
     const routine = state.routines.find((item) => item.id === state.saved.routineId);
-    if (routine) startRun(routine, { stepIndex: state.saved.stepIndex, remainingMs: state.saved.remainingMs });
+    if (routine) {
+      startRun(routine, {
+        stepIndex: state.saved.stepIndex,
+        phase: state.saved.phase,
+        remainingMs: state.saved.remainingMs,
+      });
+    }
     return;
   }
   if (action === 'delete-routine') {
@@ -933,24 +1042,24 @@ function onClick(event) {
   }
   if (action === 'prev' && state.runner) {
     const runner = state.runner;
-    runner.stepIndex = Math.max(0, runner.stepIndex - 1);
-    runner.remainingMs = Number(runner.routine.steps[runner.stepIndex].seconds || 0) * 1000;
-    runner.spokenTen = runner.remainingMs <= 10000;
-    voice.stop();
-    voice.playStep(runner.routine.steps[runner.stepIndex], runner.stepIndex === 0, !!runner.routine.builtin);
-    persistSession();
-    updateRunnerUI();
+    // In a rest the just-finished step restarts; otherwise step back one.
+    const target = runner.phase === 'rest' ? runner.stepIndex : runner.stepIndex - 1;
+    if (target < 0) return;
+    startStepAt(target);
     return;
   }
   if (action === 'add10' && state.runner) {
+    // Runtime extension only applies to the action phase, like the original.
+    if (state.runner.phase !== 'step') return;
     state.runner.remainingMs += 10000;
     state.runner.spokenTen = state.runner.remainingMs <= 10000;
+    persistSession();
     updateRunnerUI();
     return;
   }
   if (action === 'skip' && state.runner) {
     voice.stop();
-    advanceStep();
+    skipPhase();
     return;
   }
   if (action === 'end' && state.runner) {

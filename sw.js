@@ -1,4 +1,4 @@
-const CACHE = 'stretch-pwa-v5';
+const CACHE = 'stretch-pwa-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -24,7 +24,15 @@ self.addEventListener('install', (event) => {
       const response = await fetch('./audio/manifest.json', { cache: 'no-cache' });
       const manifest = await response.json();
       const files = (manifest.files || []).map((file) => './' + file);
-      await cache.addAll(files);
+      // ~1000 clips: allSettled in small batches so one missing file cannot
+      // abort the whole install, and the platform is not hit with one huge
+      // addAll transaction.
+      const SIZE = 24;
+      for (let i = 0; i < files.length; i += SIZE) {
+        await Promise.allSettled(
+          files.slice(i, i + SIZE).map((file) => cache.add(file))
+        );
+      }
     } catch (error) {
       // Audio can still be fetched on demand; offline playback needs the pack.
     }

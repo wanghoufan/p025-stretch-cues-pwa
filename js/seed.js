@@ -8,7 +8,7 @@
  * `SEED_VERSION` guards the one-time upgrade that replaces the three legacy
  * PWA presets with this catalog.
  */
-export const SEED_VERSION = 2;
+export const SEED_VERSION = 3;
 
 const HOLD_CUE_ZH = '保持 30 秒。';
 const HOLD_CUE_EN = 'Hold for 30 seconds.';
@@ -169,6 +169,7 @@ const ROUTINE_DEFS = [
     category: ['晨起'],
     difficulty: '低',
     bodypart: ['全身'],
+    restSec: 5,
     plan: ['neck-side-bend', 'cross-body-shoulder', 'doorway-chest', 'side-bend', 'cat-cow', 'cobra', 'child-pose'],
   },
   {
@@ -178,6 +179,7 @@ const ROUTINE_DEFS = [
     category: ['跑后'],
     difficulty: '中',
     bodypart: ['腿', '髋臀', '小腿'],
+    restSec: 5,
     plan: ['standing-quad', 'seated-hamstring', 'standing-calf', 'kneeling-hip-flexor', 'butterfly'],
   },
   {
@@ -187,6 +189,7 @@ const ROUTINE_DEFS = [
     category: ['办公'],
     difficulty: '低',
     bodypart: ['颈', '肩', '背', '腰腹', '髋臀', '腿'],
+    restSec: 5,
     plan: ['neck-side-bend', 'upper-trap', 'levator-scapulae', 'cross-body-shoulder', 'thoracic-rotation', 'cat-cow', 'child-pose', 'supine-spinal-twist', 'side-bend', 'butterfly', 'seated-hamstring', 'figure-four'],
   },
   {
@@ -196,6 +199,7 @@ const ROUTINE_DEFS = [
     category: ['睡前'],
     difficulty: '低',
     bodypart: ['背', '腰腹', '髋臀'],
+    restSec: 5,
     plan: ['cat-cow', 'child-pose', 'supine-spinal-twist', 'supine-knee-hug', 'glute-piriformis', 'figure-four', 'butterfly'],
   },
   {
@@ -205,6 +209,7 @@ const ROUTINE_DEFS = [
     category: ['热身'],
     difficulty: '低',
     bodypart: ['全身', '肩', '腿'],
+    restSec: 5,
     plan: ['shoulder-rolls', 'cross-body-shoulder', 'standing-quad', 'standing-hamstring', 'standing-calf'],
   },
   {
@@ -214,6 +219,7 @@ const ROUTINE_DEFS = [
     category: ['办公'],
     difficulty: '低',
     bodypart: ['颈', '肩', '背', '腰腹', '髋臀', '腿'],
+    restSec: 5,
     plan: ['neck-side-bend', 'upper-trap-press', 'levator-scapulae', 'cross-body-shoulder', 'towel-shoulder', 'cat-cow', 'child-pose', 'supine-spinal-twist', 'lat-side-bend', 'butterfly', 'seated-hamstring', 'figure-four'],
   },
   {
@@ -223,6 +229,7 @@ const ROUTINE_DEFS = [
     category: ['核心'],
     difficulty: '低',
     bodypart: ['腰腹', '髋臀', '背'],
+    restSec: 45,
     plan: [
       ['dead-bug-bent', '死虫屈膝版，每侧8次', 'Bent-knee dead bug, 8 reps per side', '每侧 8 次', '8 reps per side'],
       ['glute-bridge', '臀桥双腿，8次', 'Glute bridge, 8 reps', '8 次', '8 reps'],
@@ -236,6 +243,7 @@ const ROUTINE_DEFS = [
     category: ['核心'],
     difficulty: '中',
     bodypart: ['腰腹', '髋臀', '背'],
+    restSec: 30,
     plan: [
       ['dead-bug', '死虫标准版，每侧10次', 'Dead bug, 10 reps per side', '每侧 10 次', '10 reps per side'],
       ['glute-bridge-march', '臀桥行进，每侧10次', 'Glute bridge march, 10 reps per side', '每侧 10 次', '10 reps per side'],
@@ -251,6 +259,7 @@ const ROUTINE_DEFS = [
     category: ['核心'],
     difficulty: '高',
     bodypart: ['腰腹', '髋臀', '腿'],
+    restSec: 20,
     plan: [
       ['dead-bug-slow', '死虫慢速版，每侧12次', 'Slow dead bug, 12 reps per side', '每侧 12 次', '12 reps per side'],
       ['single-leg-glute-bridge', '单腿臀桥，每侧12次', 'Single-leg glute bridge, 12 reps per side', '每侧 12 次', '12 reps per side'],
@@ -261,8 +270,9 @@ const ROUTINE_DEFS = [
   },
 ];
 
-export const SEED_ROUTINES = ROUTINE_DEFS.map(({ plan, ...routine }) => ({
+export const SEED_ROUTINES = ROUTINE_DEFS.map(({ plan, restSec = 5, ...routine }) => ({
   ...routine,
+  restSec,
   builtin: true,
   steps: buildSteps(routine.id, plan),
 }));
