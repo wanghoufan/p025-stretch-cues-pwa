@@ -2,6 +2,7 @@ import { translate, resolveLanguage } from './i18n.js';
 import { SEED_ACTIONS, SEED_ROUTINES, SEED_VERSION } from './seed.js';
 import * as db from './db.js';
 import { VoiceEngine } from './voice.js';
+import { stepStartPlan, restPlan } from './cues.js';
 
 const appEl = document.getElementById('app');
 const voice = new VoiceEngine();
@@ -776,21 +777,43 @@ function advancePhase() {
   updateRunnerUI();
 }
 
+function playPlan(plan, step) {
+  if (plan.kind === 'speak') {
+    // Custom move: the system voice reads the name; VoiceEngine.speak falls
+    // back to the next-move clip where speechSynthesis is unavailable.
+    voice.speak(t(plan.textKey, { name: localName(step) }));
+    return;
+  }
+  voice.playSequence(plan.keys);
+}
+
+/**
+ * Announce the step whose timer has just started. After a rest the name was
+ * already spoken during the transition, so only "Go." plays here.
+ */
+function announceStepStart(step, index, routine, afterRest) {
+  if (!step) return;
+  playPlan(stepStartPlan({
+    afterRest: !!afterRest,
+    isFirst: index === 0,
+    hasClip: !!routine.builtin && !!step.clip,
+    clip: step.clip,
+  }), step);
+}
+
 /** Speak the phase just entered, with the same cues as a normal transition. */
 function announcePhaseChange(runner, wasRest) {
   const routine = runner.routine;
   const step = routine.steps[runner.stepIndex];
   if (runner.phase === 'rest') {
     const next = routine.steps[runner.stepIndex + 1];
-    // The original speaks the prepared step once, at transition start.
-    if (routine.builtin && next && next.clip) voice.playFixed('next-' + next.clip);
+    if (!next) return;
+    // The transition names the prepared step once; the step itself only
+    // gets "Go." when it starts.
+    playPlan(restPlan({ clip: routine.builtin ? (next.clip || '') : '' }), next);
     return;
   }
-  if (wasRest && step && step.clip) {
-    voice.playFixed(step.clip);
-    return;
-  }
-  if (step) voice.playStep(step, runner.stepIndex === 0, !!routine.builtin);
+  announceStepStart(step, runner.stepIndex, routine, wasRest);
 }
 
 /**
@@ -823,8 +846,8 @@ function startStepAt(index, options) {
   persistSession();
   voice.stop();
   if (opts.playCue !== false) {
-    if (opts.leadIn === false && step.clip) voice.playFixed(step.clip);
-    else voice.playStep(step, index === 0, !!runner.routine.builtin);
+    // Skipping a rest means its transition cue already named the move.
+    announceStepStart(step, index, runner.routine, opts.leadIn === false);
   }
   updateRunnerUI();
 }
@@ -899,7 +922,7 @@ function startRun(routine, options) {
 
   // A resumed rest does not replay the cue; a fresh start announces the step.
   if (startPhase === 'step') {
-    voice.playStep(startStep, startIndex === 0, !!routine.builtin);
+    announceStepStart(startStep, startIndex, routine, false);
   }
   state.runner.timer = setInterval(tick, 200);
   requestWakeLock();

@@ -122,17 +122,6 @@ export class VoiceEngine {
     this.playSequence([key]);
   }
 
-  /**
-   * `hasClip` is true for built-in routines, whose step audio ships with the
-   * app. Custom moves get a spoken lead-in and are shown on screen, because
-   * arbitrary user text cannot be pre-recorded offline.
-   */
-  playStep(step, isFirst, hasClip) {
-    const keys = [isFirst ? 'first' : 'next'];
-    keys.push(hasClip ? (step.clip || 'step-' + step.id) : 'next-move');
-    this.playSequence(keys);
-  }
-
   speak(text) {
     if (!this.enabled || !text) return;
     if (this.hasSpeech) {
