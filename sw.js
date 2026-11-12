@@ -1,4 +1,4 @@
-const CACHE = 'stretch-pwa-v9';
+const CACHE = 'stretch-pwa-v10';
 const ASSETS = [
   './',
   './index.html',
@@ -18,25 +18,41 @@ const ASSETS = [
   './audio/manifest.json',
 ];
 
+/* Fixed transition cue ("Time's up."), one per voice. Cached explicitly so a
+ * failed audio-manifest fetch during install cannot leave the rest cue silent
+ * offline. */
+const FIXED_AUDIO = [
+  './audio/zh/xiaoxiao/timeup.mp3',
+  './audio/zh/xiaoyi/timeup.mp3',
+  './audio/zh/yunxi/timeup.mp3',
+  './audio/zh/yunjian/timeup.mp3',
+  './audio/en/aria/timeup.mp3',
+  './audio/en/jenny/timeup.mp3',
+  './audio/en/guy/timeup.mp3',
+  './audio/en/andrew/timeup.mp3',
+];
+
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
     await cache.addAll(ASSETS);
+    const files = new Set(FIXED_AUDIO);
     try {
       const response = await fetch('./audio/manifest.json', { cache: 'no-cache' });
       const manifest = await response.json();
-      const files = (manifest.files || []).map((file) => './' + file);
-      // ~1000 clips: allSettled in small batches so one missing file cannot
-      // abort the whole install, and the platform is not hit with one huge
-      // addAll transaction.
-      const SIZE = 24;
-      for (let i = 0; i < files.length; i += SIZE) {
-        await Promise.allSettled(
-          files.slice(i, i + SIZE).map((file) => cache.add(file))
-        );
-      }
+      (manifest.files || []).forEach((file) => files.add('./' + file));
     } catch (error) {
       // Audio can still be fetched on demand; offline playback needs the pack.
+    }
+    // ~1000 clips: allSettled in small batches so one missing file cannot
+    // abort the whole install, and the platform is not hit with one huge
+    // addAll transaction.
+    const list = Array.from(files);
+    const SIZE = 24;
+    for (let i = 0; i < list.length; i += SIZE) {
+      await Promise.allSettled(
+        list.slice(i, i + SIZE).map((file) => cache.add(file))
+      );
     }
     await self.skipWaiting();
   })());

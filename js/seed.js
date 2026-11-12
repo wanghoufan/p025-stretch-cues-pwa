@@ -7,8 +7,11 @@
  *
  * `SEED_VERSION` guards the one-time upgrade that replaces the three legacy
  * PWA presets with this catalog.
+ *
+ * Built-in rests are 7 s: the transition has to fit "Time's up." plus the name
+ * of the upcoming move. Routines the user created keep their own restSec.
  */
-export const SEED_VERSION = 3;
+export const SEED_VERSION = 4;
 
 const HOLD_CUE_ZH = '保持 30 秒。';
 const HOLD_CUE_EN = 'Hold for 30 seconds.';
@@ -169,7 +172,7 @@ const ROUTINE_DEFS = [
     category: ['晨起'],
     difficulty: '低',
     bodypart: ['全身'],
-    restSec: 5,
+    restSec: 7,
     plan: ['neck-side-bend', 'cross-body-shoulder', 'doorway-chest', 'side-bend', 'cat-cow', 'cobra', 'child-pose'],
   },
   {
@@ -179,7 +182,7 @@ const ROUTINE_DEFS = [
     category: ['跑后'],
     difficulty: '中',
     bodypart: ['腿', '髋臀', '小腿'],
-    restSec: 5,
+    restSec: 7,
     plan: ['standing-quad', 'seated-hamstring', 'standing-calf', 'kneeling-hip-flexor', 'butterfly'],
   },
   {
@@ -189,7 +192,7 @@ const ROUTINE_DEFS = [
     category: ['办公'],
     difficulty: '低',
     bodypart: ['颈', '肩', '背', '腰腹', '髋臀', '腿'],
-    restSec: 5,
+    restSec: 7,
     plan: ['neck-side-bend', 'upper-trap', 'levator-scapulae', 'cross-body-shoulder', 'thoracic-rotation', 'cat-cow', 'child-pose', 'supine-spinal-twist', 'side-bend', 'butterfly', 'seated-hamstring', 'figure-four'],
   },
   {
@@ -199,7 +202,7 @@ const ROUTINE_DEFS = [
     category: ['睡前'],
     difficulty: '低',
     bodypart: ['背', '腰腹', '髋臀'],
-    restSec: 5,
+    restSec: 7,
     plan: ['cat-cow', 'child-pose', 'supine-spinal-twist', 'supine-knee-hug', 'glute-piriformis', 'figure-four', 'butterfly'],
   },
   {
@@ -209,7 +212,7 @@ const ROUTINE_DEFS = [
     category: ['热身'],
     difficulty: '低',
     bodypart: ['全身', '肩', '腿'],
-    restSec: 5,
+    restSec: 7,
     plan: ['shoulder-rolls', 'cross-body-shoulder', 'standing-quad', 'standing-hamstring', 'standing-calf'],
   },
   {
@@ -219,7 +222,7 @@ const ROUTINE_DEFS = [
     category: ['办公'],
     difficulty: '低',
     bodypart: ['颈', '肩', '背', '腰腹', '髋臀', '腿'],
-    restSec: 5,
+    restSec: 7,
     plan: ['neck-side-bend', 'upper-trap-press', 'levator-scapulae', 'cross-body-shoulder', 'towel-shoulder', 'cat-cow', 'child-pose', 'supine-spinal-twist', 'lat-side-bend', 'butterfly', 'seated-hamstring', 'figure-four'],
   },
   {
@@ -270,7 +273,7 @@ const ROUTINE_DEFS = [
   },
 ];
 
-export const SEED_ROUTINES = ROUTINE_DEFS.map(({ plan, restSec = 5, ...routine }) => ({
+export const SEED_ROUTINES = ROUTINE_DEFS.map(({ plan, restSec = 7, ...routine }) => ({
   ...routine,
   restSec,
   builtin: true,

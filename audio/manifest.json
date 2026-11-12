@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-11T15:12:06.878235Z",
+  "generatedAt": "2026-11-11T23:51:55.771409Z",
   "voices": {
     "zh": [
       "xiaoxiao",
@@ -176,6 +176,7 @@
     "audio/en/andrew/step-core-intermediate-4.mp3",
     "audio/en/andrew/step-core-intermediate-5.mp3",
     "audio/en/andrew/ten.mp3",
+    "audio/en/andrew/timeup.mp3",
     "audio/en/aria/action-adductor-wide.mp3",
     "audio/en/aria/action-arm-swings.mp3",
     "audio/en/aria/action-biceps-wall.mp3",
@@ -337,6 +338,7 @@
     "audio/en/aria/step-core-intermediate-4.mp3",
     "audio/en/aria/step-core-intermediate-5.mp3",
     "audio/en/aria/ten.mp3",
+    "audio/en/aria/timeup.mp3",
     "audio/en/guy/action-adductor-wide.mp3",
     "audio/en/guy/action-arm-swings.mp3",
     "audio/en/guy/action-biceps-wall.mp3",
@@ -498,6 +500,7 @@
     "audio/en/guy/step-core-intermediate-4.mp3",
     "audio/en/guy/step-core-intermediate-5.mp3",
     "audio/en/guy/ten.mp3",
+    "audio/en/guy/timeup.mp3",
     "audio/en/jenny/action-adductor-wide.mp3",
     "audio/en/jenny/action-arm-swings.mp3",
     "audio/en/jenny/action-biceps-wall.mp3",
@@ -659,6 +662,7 @@
     "audio/en/jenny/step-core-intermediate-4.mp3",
     "audio/en/jenny/step-core-intermediate-5.mp3",
     "audio/en/jenny/ten.mp3",
+    "audio/en/jenny/timeup.mp3",
     "audio/zh/xiaoxiao/action-adductor-wide.mp3",
     "audio/zh/xiaoxiao/action-arm-swings.mp3",
     "audio/zh/xiaoxiao/action-biceps-wall.mp3",
@@ -820,6 +824,7 @@
     "audio/zh/xiaoxiao/step-core-intermediate-4.mp3",
     "audio/zh/xiaoxiao/step-core-intermediate-5.mp3",
     "audio/zh/xiaoxiao/ten.mp3",
+    "audio/zh/xiaoxiao/timeup.mp3",
     "audio/zh/xiaoyi/action-adductor-wide.mp3",
     "audio/zh/xiaoyi/action-arm-swings.mp3",
     "audio/zh/xiaoyi/action-biceps-wall.mp3",
@@ -981,6 +986,7 @@
     "audio/zh/xiaoyi/step-core-intermediate-4.mp3",
     "audio/zh/xiaoyi/step-core-intermediate-5.mp3",
     "audio/zh/xiaoyi/ten.mp3",
+    "audio/zh/xiaoyi/timeup.mp3",
     "audio/zh/yunjian/action-adductor-wide.mp3",
     "audio/zh/yunjian/action-arm-swings.mp3",
     "audio/zh/yunjian/action-biceps-wall.mp3",
@@ -1142,6 +1148,7 @@
     "audio/zh/yunjian/step-core-intermediate-4.mp3",
     "audio/zh/yunjian/step-core-intermediate-5.mp3",
     "audio/zh/yunjian/ten.mp3",
+    "audio/zh/yunjian/timeup.mp3",
     "audio/zh/yunxi/action-adductor-wide.mp3",
     "audio/zh/yunxi/action-arm-swings.mp3",
     "audio/zh/yunxi/action-biceps-wall.mp3",
@@ -1302,6 +1309,7 @@
     "audio/zh/yunxi/step-core-intermediate-3.mp3",
     "audio/zh/yunxi/step-core-intermediate-4.mp3",
     "audio/zh/yunxi/step-core-intermediate-5.mp3",
-    "audio/zh/yunxi/ten.mp3"
+    "audio/zh/yunxi/ten.mp3",
+    "audio/zh/yunxi/timeup.mp3"
   ]
 }

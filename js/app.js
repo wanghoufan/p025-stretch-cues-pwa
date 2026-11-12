@@ -779,9 +779,10 @@ function advancePhase() {
 
 function playPlan(plan, step) {
   if (plan.kind === 'speak') {
-    // Custom move: the system voice reads the name; VoiceEngine.speak falls
-    // back to the next-move clip where speechSynthesis is unavailable.
-    voice.speak(t(plan.textKey, { name: localName(step) }));
+    // Custom move: the "timeup" clip plays first, then the system voice reads
+    // the name; VoiceEngine falls back to the next-move clip where
+    // speechSynthesis is unavailable.
+    voice.speak(t(plan.textKey, { name: localName(step) }), plan.leadKeys);
     return;
   }
   voice.playSequence(plan.keys);

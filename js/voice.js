@@ -78,22 +78,42 @@ export class VoiceEngine {
     }
   }
 
-  playSequence(keys) {
-    if (!this.enabled || !this.hasAudio || !keys || !keys.length) return;
+  /**
+   * Play clips back to back. `onDone` runs once the last clip ends, which is
+   * how a fixed cue (timeup) hands over to spoken text.
+   */
+  playSequence(keys, onDone) {
+    if (!this.enabled) return;
+    if (!this.hasAudio || !keys || !keys.length) {
+      if (typeof onDone === 'function') onDone();
+      return;
+    }
     this.stop();
     const token = ++this.sequenceToken;
     let index = 0;
     let blockedReported = false;
+    let finished = false;
+
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      if (typeof onDone === 'function') onDone();
+    };
 
     const fail = () => {
       if (blockedReported) return;
       blockedReported = true;
       if (this.onBlocked) this.onBlocked();
+      // A blocked clip must not swallow the spoken name that follows it.
+      finish();
     };
 
     const playNext = () => {
       if (token !== this.sequenceToken) return;
-      if (index >= keys.length) return;
+      if (index >= keys.length) {
+        finish();
+        return;
+      }
       const key = keys[index++];
       const audio = new Audio(this.clipUrl(key));
       audio.preload = 'auto';
@@ -122,17 +142,28 @@ export class VoiceEngine {
     this.playSequence([key]);
   }
 
-  speak(text) {
+  /**
+   * Read text with the system voice. `leadKeys` are clips played first — the
+   * rest cue uses this to say "Time's up." before naming a custom move.
+   */
+  speak(text, leadKeys) {
     if (!this.enabled || !text) return;
-    if (this.hasSpeech) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = this.lang === 'zh' ? 'zh-CN' : 'en-US';
-      utterance.rate = this.rate;
-      utterance.volume = 1;
-      try { window.speechSynthesis.speak(utterance); } catch (error) { /* ignore */ }
+    const say = () => {
+      if (this.hasSpeech) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = this.lang === 'zh' ? 'zh-CN' : 'en-US';
+        utterance.rate = this.rate;
+        utterance.volume = 1;
+        try { window.speechSynthesis.speak(utterance); } catch (error) { /* ignore */ }
+        return;
+      }
+      if (this.hasAudio) this.playFixed('next-move');
+    };
+    if (this.hasAudio && Array.isArray(leadKeys) && leadKeys.length) {
+      this.playSequence(leadKeys, say);
       return;
     }
-    if (this.hasAudio) this.playFixed('next-move');
+    say();
   }
 
   stop() {
