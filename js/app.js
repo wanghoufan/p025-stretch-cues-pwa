@@ -3,6 +3,7 @@ import { SEED_ACTIONS, SEED_ROUTINES, SEED_VERSION } from './seed.js';
 import * as db from './db.js';
 import { VoiceEngine } from './voice.js';
 import { stepStartPlan, restPlan } from './cues.js';
+import { SPEED_CHOICES, normalizeSpeed, routineMs } from './speed.js';
 
 const appEl = document.getElementById('app');
 const voice = new VoiceEngine();
@@ -28,6 +29,7 @@ const state = {
   languageSetting: 'auto',
   speech: true,
   rate: 0.95,
+  speed: 1,
   zhVoice: 'xiaoxiao',
   enVoice: 'aria',
   routines: [],
@@ -114,6 +116,7 @@ async function saveSettings() {
     language: state.languageSetting,
     speech: state.speech,
     rate: state.rate,
+    speed: state.speed,
     zhVoice: state.zhVoice,
     enVoice: state.enVoice,
   });
@@ -150,6 +153,7 @@ async function boot() {
       state.languageSetting = settings.language || 'auto';
       state.speech = settings.speech !== false;
       state.rate = Number(settings.rate) || 0.95;
+      state.speed = normalizeSpeed(settings.speed);
       state.zhVoice = settings.zhVoice || 'xiaoxiao';
       state.enVoice = settings.enVoice || 'aria';
     }
@@ -329,6 +333,9 @@ function screenRunner() {
       </div>
 
       <h1 class="routine-title">${esc(localName(runner.routine))}</h1>
+      ${runner.speed !== 1
+        ? `<p class="test-mode" id="test-mode">${esc(t('runner.testMode', { value: runner.speed }))}</p>`
+        : ''}
       <div class="countdown" id="countdown">${formatClock(runner.remainingMs)}</div>
       <p class="phase" id="phase">${esc(t('runner.cueLabel'))}</p>
 
@@ -368,6 +375,9 @@ function screenDone() {
       <div class="card">
         <p class="eyebrow">${esc(t('runner.total'))}</p>
         <p class="big-number">${esc(formatDuration(result.seconds))}</p>
+        ${result.speed && result.speed !== 1
+          ? `<p class="muted">${esc(t('runner.testModeNote', { value: result.speed }))}</p>`
+          : ''}
       </div>
       <button class="primary" data-action="go-home">${esc(t('runner.backHome'))}</button>
     </div>`;
@@ -418,6 +428,18 @@ function screenSettings() {
           <output id="rate-value">${esc(t('settings.rateValue', { value: state.rate.toFixed(2) }))}</output>
         </label>
         <input type="range" min="0.7" max="1.3" step="0.05" value="${state.rate}" data-setting="rate">
+      </section>
+
+      <section class="card">
+        <h2>${esc(t('settings.speed'))}</h2>
+        <p class="muted">${esc(t('settings.speedDesc'))}</p>
+        <div class="choices">
+          ${SPEED_CHOICES.map((value) => `
+            <label class="choice">
+              <input type="radio" name="speed" value="${value}" ${state.speed === value ? 'checked' : ''}>
+              <span>${esc(t('settings.speed.' + value))}</span>
+            </label>`).join('')}
+        </div>
       </section>
 
       <section class="card">
@@ -676,17 +698,24 @@ function tick() {
   }
 
   if (delta >= CATCHUP_GAP_MS || document.visibilityState === 'hidden') {
-    catchUp(runner, delta);
+    catchUp(runner, routineMs(delta, runner.speed));
     return;
   }
 
-  runner.remainingMs -= delta;
+  // Real elapsed time × speed. Everything the runner keeps (remainingMs,
+  // elapsedActionMs, the 10 s cue, the progress bar) is routine time, so a 6×
+  // tick of 200 ms consumes 1200 ms and a 60 s move ends after 10 s.
+  const scaled = routineMs(delta, runner.speed);
+  runner.remainingMs -= scaled;
   if (runner.phase === 'step') {
     // Stats count the action time only, matching the original runner.
-    runner.elapsedActionMs += delta;
+    runner.elapsedActionMs += scaled;
   }
   if (runner.remainingMs <= 0) {
-    advancePhase();
+    // A scaled tick can cross the phase boundary; the overshoot is carried into
+    // the next phase so no time is lost. At 1× the overshoot is dropped exactly
+    // as before.
+    advancePhase(runner.speed === 1 ? 0 : -runner.remainingMs);
     return;
   }
   announceTenIfNeeded(runner);
@@ -694,9 +723,11 @@ function tick() {
 }
 
 /**
- * Settle an arbitrarily long gap. Whole phases are consumed in one arithmetic
- * pass — one iteration per phase, never one per millisecond — and only the
- * phase we landed on is announced; finished phases are not replayed.
+ * Settle an arbitrarily long gap. `deltaMs` is already routine time
+ * (real gap × speed) — the seconds a hidden tab or a locked screen owes the
+ * routine. Whole phases are consumed in one arithmetic pass — one iteration per
+ * phase, never one per millisecond — and only the phase we landed on is
+ * announced; finished phases are not replayed.
  */
 function catchUp(runner, deltaMs) {
   const outcome = advanceBy(runner, deltaMs);
@@ -716,9 +747,9 @@ function catchUp(runner, deltaMs) {
 }
 
 /**
- * Consume `deltaMs` of real time from the runner, walking the state machine
- * phase by phase. Returns how many phases were left behind and whether the
- * routine completed.
+ * Consume `deltaMs` of routine time (already multiplied by the session speed)
+ * from the runner, walking the state machine phase by phase. Returns how many
+ * phases were left behind and whether the routine completed.
  */
 function advanceBy(runner, deltaMs) {
   let left = Math.max(0, deltaMs);
@@ -761,19 +792,35 @@ function stepPhaseSilently(runner) {
   return true;
 }
 
-/** Step → rest (when the routine has one) → next step; the last step finishes. */
-function advancePhase() {
+/**
+ * Step → rest (when the routine has one) → next step; the last step finishes.
+ * `overshootMs` is routine time that ran past the boundary (only possible above
+ * 1×) and is carried into the following phases, so the scaled clock can neither
+ * lose nor rewind time.
+ */
+function advancePhase(overshootMs) {
   const runner = state.runner;
   if (!runner) return;
-  const wasRest = runner.phase === 'rest';
-  if (!stepPhaseSilently(runner)) {
-    finish(true);
-    return;
+  let afterRest = false;
+  let carry = Math.max(0, Number(overshootMs) || 0);
+  for (;;) {
+    const fromRest = runner.phase === 'rest';
+    if (!stepPhaseSilently(runner)) {
+      finish(true);
+      return;
+    }
+    if (runner.phase === 'step') afterRest = fromRest;
+    if (carry <= 0) break;
+    if (carry < runner.remainingMs) {
+      runner.remainingMs -= carry;
+      break;
+    }
+    carry -= runner.remainingMs;
   }
   runner.spokenTen = runner.remainingMs <= 10000;
   persistSession();
   voice.stop();
-  announcePhaseChange(runner, wasRest);
+  announcePhaseChange(runner, afterRest);
   updateRunnerUI();
 }
 
@@ -890,6 +937,9 @@ function startAction(key) {
 function startRun(routine, options) {
   if (!routine) return;
   const opts = options || {};
+  // The speed is snapshotted for the whole session; a resumed session keeps the
+  // speed it was started with so the countdown never changes pace mid-move.
+  const speed = normalizeSpeed(opts.speed == null ? state.speed : opts.speed);
   const startIndex = Math.max(0, Math.min(routine.steps.length - 1, Number(opts.stepIndex) || 0));
   const startStep = routine.steps[startIndex];
   const startPhase = opts.phase === 'rest' && restSecondsFor({ routine, stepIndex: startIndex }, startIndex) > 0
@@ -913,6 +963,7 @@ function startRun(routine, options) {
     lastTickAt: Date.now(),
     elapsedActionMs: 0,
     spokenTen: remaining <= 10000,
+    speed,
     timer: null,
   };
   state.screen = 'runner';
@@ -937,6 +988,7 @@ function persistSession() {
     stepIndex: runner.stepIndex,
     phase: runner.phase,
     remainingMs: Math.max(0, Math.round(runner.remainingMs)),
+    speed: runner.speed,
     savedAt: Date.now(),
   };
   state.saved = payload;
@@ -950,8 +1002,11 @@ function finish(completed) {
   voice.stop();
   const seconds = Math.round(runner.elapsedActionMs / 1000);
   const name = localName(runner.routine);
+  // A test-mode session (any speed but 1×) never reaches the history store, so
+  // a 6× run cannot pollute the practice totals with scaled numbers.
+  const testMode = runner.speed !== 1;
 
-  if (seconds >= 5) {
+  if (!testMode && seconds >= 5) {
     const entry = {
       id: 'history-' + Date.now(),
       routineId: runner.routine.id,
@@ -967,7 +1022,7 @@ function finish(completed) {
 
   if (completed) voice.playFixed('done');
 
-  state.lastResult = { completed: !!completed, name, seconds };
+  state.lastResult = { completed: !!completed, name, seconds, speed: runner.speed };
   state.runner = null;
   state.saved = null;
   localStorage.removeItem(ACTIVE_KEY);
@@ -1172,6 +1227,7 @@ async function importBackup(file) {
       state.languageSetting = payload.data.settings.language || 'auto';
       state.speech = payload.data.settings.speech !== false;
       state.rate = Number(payload.data.settings.rate) || 0.95;
+      state.speed = normalizeSpeed(payload.data.settings.speed);
       state.zhVoice = payload.data.settings.zhVoice || 'xiaoxiao';
       state.enVoice = payload.data.settings.enVoice || 'aria';
       state.lang = resolveLanguage(state.languageSetting);
@@ -1259,6 +1315,7 @@ function onClick(event) {
         stepIndex: state.saved.stepIndex,
         phase: state.saved.phase,
         remainingMs: state.saved.remainingMs,
+        speed: state.saved.speed,
       });
     }
     return;
@@ -1447,6 +1504,12 @@ function onChange(event) {
     saveSettings();
     return;
   }
+  if (el.name === 'speed') {
+    // Only new sessions pick this up; a running session keeps its own speed.
+    state.speed = normalizeSpeed(el.value);
+    saveSettings();
+    return;
+  }
   if (el.id === 'import-file' && el.files && el.files[0]) {
     importBackup(el.files[0]);
     el.value = '';
@@ -1485,7 +1548,8 @@ function onVisibilityChange() {
   const delta = Math.max(0, now - runner.lastTickAt);
   runner.lastTickAt = now;
   if (!runner.paused && delta > 0) {
-    const outcome = advanceBy(runner, delta);
+    // Same conversion as the tick: real time away × speed.
+    const outcome = advanceBy(runner, routineMs(delta, runner.speed));
     if (outcome.finished) {
       finish(true);
       return;

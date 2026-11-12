@@ -1,4 +1,4 @@
-const CACHE = 'stretch-pwa-v10';
+const CACHE = 'stretch-pwa-v11';
 const ASSETS = [
   './',
   './index.html',
@@ -10,6 +10,7 @@ const ASSETS = [
   './js/db.js',
   './js/i18n.js',
   './js/seed.js',
+  './js/speed.js',
   './js/voice.js',
   './icons/icon-180.png',
   './icons/icon-192.png',
